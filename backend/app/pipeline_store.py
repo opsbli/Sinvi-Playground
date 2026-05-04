@@ -188,6 +188,99 @@ class PipelineStore:
             raise RuntimeError("Pipeline artifact was not persisted.")
         return self._row_to_artifact(row)
 
+    def update_pipeline_run_status(
+        self,
+        run_id: str,
+        *,
+        status: str,
+        current_stage_id: str | None = None,
+    ) -> None:
+        now = _utc_now_iso()
+        with self._connect() as connection:
+            connection.execute(
+                """
+                UPDATE pipeline_runs
+                SET status = ?, current_stage_id = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (status, current_stage_id, now, run_id),
+            )
+
+    def update_stage_run(
+        self,
+        stage_run_id: str,
+        *,
+        status: str,
+        attempt: int | None = None,
+        input_payload: dict[str, Any] | None = None,
+        output_payload: dict[str, Any] | None = None,
+        error_message: str | None = None,
+        started_at: str | None = None,
+        completed_at: str | None = None,
+    ) -> None:
+        current = self._get_stage_run_row(stage_run_id)
+        if current is None:
+            raise ValueError("Pipeline stage run not found.")
+        with self._connect() as connection:
+            connection.execute(
+                """
+                UPDATE pipeline_stage_runs
+                SET status = ?,
+                    attempt = ?,
+                    input_payload = ?,
+                    output_payload = ?,
+                    error_message = ?,
+                    started_at = ?,
+                    completed_at = ?
+                WHERE id = ?
+                """,
+                (
+                    status,
+                    current["attempt"] if attempt is None else attempt,
+                    current["input_payload"] if input_payload is None else _json_dumps(input_payload),
+                    current["output_payload"] if output_payload is None else _json_dumps(output_payload),
+                    error_message,
+                    current["started_at"] if started_at is None else started_at,
+                    current["completed_at"] if completed_at is None else completed_at,
+                    stage_run_id,
+                ),
+            )
+
+    def create_stage_run(
+        self,
+        pipeline_run_id: str,
+        stage_definition_id: str,
+        *,
+        attempt: int,
+        input_payload: dict[str, Any] | None = None,
+    ) -> PipelineStageRun:
+        stage_run_id = _new_id("psrun")
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO pipeline_stage_runs
+                    (id, pipeline_run_id, stage_definition_id, status, attempt, input_payload, output_payload)
+                VALUES (?, ?, ?, 'pending', ?, ?, '{}')
+                """,
+                (stage_run_id, pipeline_run_id, stage_definition_id, attempt, _json_dumps(input_payload or {})),
+            )
+        row = self._get_stage_run_row(stage_run_id)
+        if row is None:
+            raise RuntimeError("Pipeline stage run was not persisted.")
+        return self._row_to_stage_run(row)
+
+    def _get_stage_run_row(self, stage_run_id: str) -> sqlite3.Row | None:
+        with self._connect() as connection:
+            return connection.execute(
+                """
+                SELECT id, pipeline_run_id, stage_definition_id, status, attempt,
+                       input_payload, output_payload, error_message, started_at, completed_at
+                FROM pipeline_stage_runs
+                WHERE id = ?
+                """,
+                (stage_run_id,),
+            ).fetchone()
+
     def _row_to_run(self, connection: sqlite3.Connection, row: sqlite3.Row) -> PipelineRun:
         return PipelineRun(
             id=row["id"],

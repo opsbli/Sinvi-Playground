@@ -42,6 +42,28 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
     )
     connection.execute(
         """
+        CREATE TABLE IF NOT EXISTS agent_import_metadata (
+            agent_id TEXT PRIMARY KEY,
+            pipeline_family TEXT NOT NULL,
+            role TEXT NOT NULL,
+            source_provider TEXT NOT NULL,
+            source_path TEXT NOT NULL,
+            source_hash TEXT NOT NULL,
+            imported_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE,
+            UNIQUE (pipeline_family, role)
+        )
+        """
+    )
+    connection.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_agent_import_metadata_family_role
+        ON agent_import_metadata(pipeline_family, role)
+        """
+    )
+    connection.execute(
+        """
         CREATE TABLE IF NOT EXISTS workflows (
             id TEXT PRIMARY KEY,
             name TEXT NOT NULL,

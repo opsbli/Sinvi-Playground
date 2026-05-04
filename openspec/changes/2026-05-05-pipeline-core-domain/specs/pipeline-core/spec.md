@@ -9,6 +9,15 @@ The system SHALL allow clients to create and read pipeline definitions with orde
 - AND each stage has a stable id, `stage_order`, `role`, `agent_id`, and default `retry_limit` of 1 when omitted
 - AND reading the definition returns stages ordered by `stage_order`
 
+#### Scenario: Reject duplicate stage order
+- WHEN a client submits a pipeline definition with duplicate `stage_order` values
+- THEN the system rejects the request as a client validation error
+- AND the system does not persist the invalid definition
+
+#### Scenario: Reject orphan stage definitions
+- WHEN a pipeline stage definition references a missing pipeline definition
+- THEN the database rejects the row with a foreign key error
+
 ### Requirement: Pipeline runs initialize pending stage runs
 The system SHALL allow clients to create a pipeline run for an existing pipeline definition without executing any stages.
 

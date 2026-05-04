@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 PipelineRunStatus = Literal["pending", "running", "done", "blocked", "failed"]
@@ -22,6 +22,13 @@ class PipelineDefinitionCreate(BaseModel):
     kind: str = Field(min_length=1, max_length=80)
     description: str | None = Field(default=None, max_length=500)
     stages: list[PipelineStageDefinitionCreate] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def reject_duplicate_stage_order(self) -> "PipelineDefinitionCreate":
+        stage_orders = [stage.stage_order for stage in self.stages]
+        if len(stage_orders) != len(set(stage_orders)):
+            raise ValueError("stage_order values must be unique within a pipeline definition.")
+        return self
 
 
 class PipelineStageDefinition(PipelineStageDefinitionCreate):

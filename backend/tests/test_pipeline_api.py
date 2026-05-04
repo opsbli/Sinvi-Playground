@@ -27,3 +27,29 @@ def test_pipeline_api_creates_definition_and_run(api_client) -> None:
     )
     assert run_response.status_code == 200
     assert run_response.json()["current_stage_id"] == definition["stages"][0]["id"]
+
+
+def test_pipeline_api_rejects_duplicate_stage_order(api_client) -> None:
+    response = api_client.post(
+        "/api/pipelines",
+        json={
+            "name": "AI Coding",
+            "kind": "sequential_pipeline",
+            "stages": [
+                {
+                    "name": "Design",
+                    "role": "designer",
+                    "agent_id": "agent_designer",
+                    "stage_order": 1,
+                },
+                {
+                    "name": "Review",
+                    "role": "reviewer",
+                    "agent_id": "agent_reviewer",
+                    "stage_order": 1,
+                },
+            ],
+        },
+    )
+
+    assert response.status_code == 422

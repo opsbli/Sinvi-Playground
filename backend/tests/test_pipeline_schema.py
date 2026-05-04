@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import pytest
+from pydantic import ValidationError
+
 from app.pipeline_schemas import PipelineDefinitionCreate, PipelineRunCreate
 
 
@@ -28,3 +31,25 @@ def test_pipeline_run_create_accepts_input_payload() -> None:
     )
 
     assert payload.input_payload["story"] == "Build layout"
+
+
+def test_pipeline_definition_rejects_duplicate_stage_order() -> None:
+    with pytest.raises(ValidationError):
+        PipelineDefinitionCreate(
+            name="AI Coding",
+            kind="sequential_pipeline",
+            stages=[
+                {
+                    "name": "Design",
+                    "role": "designer",
+                    "agent_id": "agent_designer",
+                    "stage_order": 1,
+                },
+                {
+                    "name": "Review",
+                    "role": "reviewer",
+                    "agent_id": "agent_reviewer",
+                    "stage_order": 1,
+                },
+            ],
+        )

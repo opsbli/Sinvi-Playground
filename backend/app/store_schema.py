@@ -10,7 +10,7 @@ def ensure_column(
     ddl_fragment: str,
 ) -> None:
     rows = connection.execute(f"PRAGMA table_info({table_name})").fetchall()
-    columns = {row["name"] for row in rows}
+    columns = {row["name"] if isinstance(row, sqlite3.Row) else row[1] for row in rows}
     if column_name not in columns:
         connection.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {ddl_fragment}")
 
@@ -139,7 +139,8 @@ def initialize_schema(connection: sqlite3.Connection) -> None:
             agent_id TEXT NOT NULL,
             stage_order INTEGER NOT NULL,
             retry_limit INTEGER NOT NULL DEFAULT 1,
-            FOREIGN KEY (pipeline_id) REFERENCES pipeline_definitions(id)
+            FOREIGN KEY (pipeline_id) REFERENCES pipeline_definitions(id),
+            UNIQUE (pipeline_id, stage_order)
         )
         """
     )

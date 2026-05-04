@@ -5,6 +5,7 @@ openclaw-main/
 agentic-workflow-playground-ui/
 backend/.runtime/
 backend/data/*.db
+backend/data/*.db.bak-*
 backend/uvicorn*.log
 backend/generated/
 frontend/dist/

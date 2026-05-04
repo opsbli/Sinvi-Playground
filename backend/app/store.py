@@ -1558,8 +1558,66 @@ class SQLitePlaygroundStore:
         messages.reverse()  # 按时间正序返回
         return messages
 
+    def _dedupe_known_seed_workflows(self) -> None:
+        known_seed_workflows = {
+            ("Router", "router_specialists"),
+            ("Planner", "planner_executor"),
+            ("Supervisor", "supervisor_dynamic"),
+            ("planner_executor workflow", "planner_executor"),
+            ("supervisor_dynamic workflow", "supervisor_dynamic"),
+            ("single_agent_chat workflow", "single_agent_chat"),
+            ("peer_handoff workflow", "peer_handoff"),
+        }
+        seen: set[tuple[str, str]] = set()
+        duplicate_ids: list[str] = []
+        for workflow in self.list_workflows():
+            key = (workflow.name, workflow.type)
+            if key not in known_seed_workflows:
+                continue
+            if key in seen:
+                duplicate_ids.append(workflow.id)
+                continue
+            seen.add(key)
+
+        for workflow_id in duplicate_ids:
+            self.delete_workflow(workflow_id)
+
+    def _referenced_agent_ids(self) -> set[str]:
+        referenced: set[str] = set()
+        for workflow in self.list_workflows():
+            referenced.update(workflow.specialist_agent_ids or [])
+        return referenced
+
+    def _dedupe_unreferenced_known_seed_agents(self, names: set[str]) -> None:
+        if not names:
+            return
+
+        placeholders = ",".join("?" for _ in names)
+        with self._connect() as connection:
+            rows = connection.execute(
+                f"""
+                SELECT id, name
+                FROM agents
+                WHERE name IN ({placeholders})
+                ORDER BY created_at ASC, id ASC
+                """,
+                tuple(names),
+            ).fetchall()
+
+        by_name: dict[str, list[str]] = {}
+        for row in rows:
+            by_name.setdefault(str(row["name"]), []).append(str(row["id"]))
+
+        referenced_ids = self._referenced_agent_ids()
+        for agent_ids in by_name.values():
+            for agent_id in agent_ids[1:]:
+                if agent_id in referenced_ids:
+                    continue
+                self.delete_agent(agent_id)
+
     def seed_defaults(self) -> None:
         self._rename_default_workflow_names()
+        self._dedupe_known_seed_workflows()
 
         skills = self.list_skills()
         skill_id_by_name = {skill.name: skill.id for skill in skills}
@@ -1676,8 +1734,9 @@ class SQLitePlaygroundStore:
             )
         agents = self.list_agents()
 
-        if not agents:
-            for spec in default_agent_specs:
+        existing_default_names = {agent.name for agent in agents}
+        for spec in default_agent_specs:
+            if spec["name"] not in existing_default_names:
                 self.create_agent(
                     AgentDefinitionCreate(
                         name=spec["name"],
@@ -1687,7 +1746,8 @@ class SQLitePlaygroundStore:
                         builtin_capabilities=["filesystem"],
                     )
                 )
-            agents = self.list_agents()
+                existing_default_names.add(spec["name"])
+        agents = self.list_agents()
 
         spec_by_name = {spec["name"]: spec for spec in default_agent_specs}
         for agent in agents:
@@ -1697,6 +1757,13 @@ class SQLitePlaygroundStore:
             desired = resolve_skill_ids(spec["skill_names"])
             if desired and not agent.skill_ids:
                 self.set_agent_skill_ids(agent.id, desired)
+        known_seed_agent_names = set(spec_by_name) | {
+            "Agent 1",
+            "Agent 2",
+            "Alpha Specialist",
+            "Beta Specialist",
+        }
+        self._dedupe_unreferenced_known_seed_agents(known_seed_agent_names)
         self._materialize_db_skills_to_files()
         self._migrate_and_clear_db_skills()
 

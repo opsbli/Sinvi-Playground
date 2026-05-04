@@ -10,6 +10,7 @@ from typing import Any
 from uuid import uuid4
 
 from .settings_bridge import settings
+from .store_schema import initialize_schema
 from .schemas import (
     AgentDefinition,
     AgentDefinitionCreate,
@@ -69,130 +70,9 @@ class SQLitePlaygroundStore:
         connection.row_factory = sqlite3.Row
         return connection
 
-    def _ensure_column(
-        self,
-        connection: sqlite3.Connection,
-        table_name: str,
-        column_name: str,
-        ddl_fragment: str,
-    ) -> None:
-        rows = connection.execute(f"PRAGMA table_info({table_name})").fetchall()
-        columns = {row["name"] for row in rows}
-        if column_name not in columns:
-            connection.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {ddl_fragment}")
-
     def _init_db(self) -> None:
         with self._connect() as connection:
-            connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS agents (
-                    id TEXT PRIMARY KEY,
-                    name TEXT NOT NULL,
-                    description TEXT NOT NULL,
-                    system_prompt TEXT NOT NULL,
-                    model TEXT NULL,
-                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-                )
-                """
-            )
-            self._ensure_column(
-                connection,
-                "agents",
-                "skill_ids",
-                "TEXT NOT NULL DEFAULT '[]'",
-            )
-            self._ensure_column(
-                connection,
-                "agents",
-                "builtin_capabilities",
-                "TEXT NOT NULL DEFAULT '[]'",
-            )
-            connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS workflows (
-                    id TEXT PRIMARY KEY,
-                    name TEXT NOT NULL,
-                    type TEXT NOT NULL,
-                    specialist_agent_ids TEXT NOT NULL,
-                    router_prompt TEXT NOT NULL,
-                    finalizer_enabled INTEGER NOT NULL,
-                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-                )
-                """
-            )
-            connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS skills (
-                    id TEXT PRIMARY KEY,
-                    name TEXT NOT NULL,
-                    description TEXT NOT NULL,
-                    instruction TEXT NOT NULL,
-                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-                )
-                """
-            )
-            self._ensure_column(
-                connection,
-                "skills",
-                "source_provider",
-                "TEXT NULL",
-            )
-            self._ensure_column(
-                connection,
-                "skills",
-                "source_skill_id",
-                "TEXT NULL",
-            )
-            self._ensure_column(
-                connection,
-                "skills",
-                "local_path",
-                "TEXT NULL",
-            )
-            connection.execute(
-                """
-                CREATE UNIQUE INDEX IF NOT EXISTS idx_skills_source_unique
-                ON skills(source_provider, source_skill_id)
-                """
-            )
-            connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS conversations (
-                    id TEXT PRIMARY KEY,
-                    workflow_id TEXT NOT NULL,
-                    title TEXT NULL,
-                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-                )
-                """
-            )
-            connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS messages (
-                    id TEXT PRIMARY KEY,
-                    conversation_id TEXT NOT NULL,
-                    role TEXT NOT NULL,
-                    content TEXT NOT NULL,
-                    agent_name TEXT NULL,
-                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-                )
-                """
-            )
-            connection.execute(
-                """
-                CREATE INDEX IF NOT EXISTS idx_messages_conversation_id
-                ON messages(conversation_id)
-                """
-            )
-            connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS app_settings (
-                    key TEXT PRIMARY KEY,
-                    value TEXT NOT NULL,
-                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-                )
-                """
-            )
+            initialize_schema(connection)
 
     def _rename_default_workflow_names(self) -> None:
         rename_pairs = [

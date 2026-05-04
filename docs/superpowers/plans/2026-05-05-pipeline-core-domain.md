@@ -26,7 +26,7 @@
 - Create: `backend/app/pipeline_schemas.py`
 - Test: `backend/tests/test_pipeline_schema.py`
 
-- [ ] **Step 1: Write the failing schema test**
+- [x] **Step 1: Write the failing schema test**
 
 ```python
 from app.pipeline_schemas import PipelineDefinitionCreate, PipelineRunCreate
@@ -54,16 +54,16 @@ def test_pipeline_run_create_accepts_input_payload():
     assert payload.input_payload["story"] == "Build layout"
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest backend/tests/test_pipeline_schema.py -q`
 Expected: FAIL with `ModuleNotFoundError: No module named 'app.pipeline_schemas'`.
 
-- [ ] **Step 3: Add minimal schema implementation**
+- [x] **Step 3: Add minimal schema implementation**
 
 Create `backend/app/pipeline_schemas.py` with request/response models for definition, stage definition, run, stage run, and artifact.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `python -m pytest backend/tests/test_pipeline_schema.py -q`
 Expected: PASS.
@@ -74,7 +74,7 @@ Expected: PASS.
 - Modify: `backend/app/store_schema.py`
 - Test: `backend/tests/test_pipeline_store.py`
 
-- [ ] **Step 1: Write failing schema initialization test**
+- [x] **Step 1: Write failing schema initialization test**
 
 ```python
 import sqlite3
@@ -98,16 +98,16 @@ def test_initialize_schema_creates_pipeline_tables():
     assert "pipeline_artifacts" in names
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest backend/tests/test_pipeline_store.py::test_initialize_schema_creates_pipeline_tables -q`
 Expected: FAIL because pipeline tables do not exist.
 
-- [ ] **Step 3: Add table creation SQL**
+- [x] **Step 3: Add table creation SQL**
 
 Add table creation statements to `initialize_schema(connection)` in `backend/app/store_schema.py`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `python -m pytest backend/tests/test_pipeline_store.py::test_initialize_schema_creates_pipeline_tables -q`
 Expected: PASS.
@@ -118,7 +118,7 @@ Expected: PASS.
 - Create: `backend/app/pipeline_store.py`
 - Test: `backend/tests/test_pipeline_store.py`
 
-- [ ] **Step 1: Add failing CRUD test**
+- [x] **Step 1: Add failing CRUD test**
 
 ```python
 from pathlib import Path
@@ -152,16 +152,16 @@ def test_pipeline_store_creates_definition_and_run(tmp_path: Path):
     assert [stage.status for stage in detail.stage_runs] == ["pending", "pending"]
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest backend/tests/test_pipeline_store.py -q`
 Expected: FAIL because `app.pipeline_store` does not exist.
 
-- [ ] **Step 3: Implement store**
+- [x] **Step 3: Implement store**
 
 Create `PipelineStore` with `create_pipeline_definition`, `list_pipeline_definitions`, `get_pipeline_definition`, `create_pipeline_run`, and `get_pipeline_run`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `python -m pytest backend/tests/test_pipeline_store.py -q`
 Expected: PASS.
@@ -173,7 +173,7 @@ Expected: PASS.
 - Modify: `backend/app/routes.py`
 - Test: `backend/tests/test_pipeline_api.py`
 
-- [ ] **Step 1: Write failing API test**
+- [x] **Step 1: Write failing API test**
 
 ```python
 def test_pipeline_api_creates_definition_and_run(api_client):
@@ -199,16 +199,16 @@ def test_pipeline_api_creates_definition_and_run(api_client):
     assert run_response.json()["current_stage_id"] == definition["stages"][0]["id"]
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest backend/tests/test_pipeline_api.py -q`
 Expected: FAIL with 404 for `/api/pipelines`.
 
-- [ ] **Step 3: Implement route module and include router**
+- [x] **Step 3: Implement route module and include router**
 
 Create `routes_pipelines.py` using `PipelineStore(store.db_path)` or an equivalent shared instance, then include it from `routes.py`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `python -m pytest backend/tests/test_pipeline_api.py -q`
 Expected: PASS.
@@ -218,12 +218,12 @@ Expected: PASS.
 **Files:**
 - No new files.
 
-- [ ] **Step 1: Run full backend tests**
+- [x] **Step 1: Run full backend tests**
 
 Run: `python -m pytest backend/tests -q`
 Expected: all tests pass.
 
-- [ ] **Step 2: Review OpenSpec artifacts**
+- [x] **Step 2: Review OpenSpec artifacts**
 
 Read:
 - `openspec/changes/2026-05-05-pipeline-core-domain/proposal.md`
@@ -232,7 +232,7 @@ Read:
 
 Expected: implementation scope matches artifacts; no runner, PRD generation, import/export, or UI work is included.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add backend/app/pipeline_schemas.py backend/app/pipeline_store.py backend/app/routes_pipelines.py backend/app/routes.py backend/app/store_schema.py backend/tests/test_pipeline_schema.py backend/tests/test_pipeline_store.py backend/tests/test_pipeline_api.py openspec/changes/2026-05-05-pipeline-core-domain docs/superpowers/plans/2026-05-05-pipeline-core-domain.md

@@ -4,6 +4,7 @@ from fastapi import APIRouter
 
 from .routes_agents import router as agents_router
 from .routes_conversations import router as conversations_router
+from .routes_pipelines import router as pipelines_router
 from .routes_runs import router as runs_router
 from .routes_settings import router as settings_router
 from .routes_skills import router as skills_router
@@ -16,6 +17,7 @@ router.include_router(skills_router)
 router.include_router(conversations_router)
 router.include_router(workflows_router)
 router.include_router(runs_router)
+router.include_router(pipelines_router)
 router.include_router(settings_router)
 
 

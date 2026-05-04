@@ -110,6 +110,40 @@ export function fetchWorkflows() {
   return request("/api/workflows");
 }
 
+export function fetchPipelines() {
+  return request("/api/pipelines");
+}
+
+export function bootstrapAiCodingPipeline() {
+  return request("/api/pipelines/ai-coding/bootstrap", {
+    method: "POST",
+  });
+}
+
+export function generatePrdStories(payload) {
+  return request("/api/pipelines/prd-story-generation", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function createPipelineRun(pipelineId, payload) {
+  return request(`/api/pipelines/${pipelineId}/runs`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function fetchPipelineRun(runId) {
+  return request(`/api/pipelines/runs/${runId}`);
+}
+
+export function executeSequentialPipelineRun(runId) {
+  return request(`/api/pipelines/runs/${runId}/execute-sequential`, {
+    method: "POST",
+  });
+}
+
 export function createWorkflow(payload) {
   return request("/api/workflows", {
     method: "POST",

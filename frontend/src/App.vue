@@ -2,6 +2,7 @@
 import { computed, onMounted, provide, ref, watch } from "vue";
 import {
   Activity,
+  Boxes,
   BrainCircuit,
   GitBranch,
   LayoutDashboard,
@@ -13,14 +14,19 @@ import {
 import {
   createAgent,
   createConversation,
+  createPipelineRun,
   createWorkflow,
   deleteAgent,
   deleteWorkflow,
+  bootstrapAiCodingPipeline,
+  executeSequentialPipelineRun,
   fetchAppSettings,
   fetchAgents,
   fetchConversation,
+  fetchPipelines,
   fetchSkills,
   fetchTemplates,
+  generatePrdStories,
   fetchWorkflowGraph,
   fetchWorkflows,
   updateAgent,
@@ -33,6 +39,7 @@ import AgentsPage from "./pages/AgentsPage.vue";
 import { I18N_KEY, createUiI18n } from "./i18n";
 import OverviewPage from "./pages/OverviewPage.vue";
 import PlaygroundPage from "./pages/PlaygroundPage.vue";
+import PipelinesPage from "./pages/PipelinesPage.vue";
 import SettingsPage from "./pages/SettingsPage.vue";
 import WorkflowsPage from "./pages/WorkflowsPage.vue";
 
@@ -40,7 +47,9 @@ const templates = ref([]);
 const skills = ref([]);
 const agents = ref([]);
 const workflows = ref([]);
+const pipelines = ref([]);
 const selectedWorkflowId = ref("");
+const selectedPipelineRun = ref(null);
 const selectedGraph = ref(null);
 const lastRun = ref(null);
 const loading = ref(false);
@@ -56,6 +65,7 @@ const activeRunController = ref(null);
 const skillSyncStatus = ref("");
 const appSettings = ref(null);
 const savingSettings = ref(false);
+const pipelineBusy = ref(false);
 const conversationStorageKey = "agent-playground:workflow-conversations";
 const selectedWorkflowStorageKey = "agent-playground:selected-workflow";
 
@@ -67,6 +77,7 @@ const navItems = computed(() => [
   { id: "overview", label: t("nav.overview"), icon: LayoutDashboard },
   { id: "agents", label: t("nav.agents"), icon: Users },
   { id: "workflows", label: t("nav.workflows"), icon: GitBranch },
+  { id: "pipelines", label: t("nav.pipelines"), icon: Boxes },
   { id: "playground", label: t("nav.playground"), icon: Play },
   { id: "settings", label: t("nav.settings"), icon: Settings2 },
 ]);
@@ -166,11 +177,12 @@ async function restoreConversation(workflowId) {
 }
 
 async function loadInitialData() {
-  [templates.value, skills.value, agents.value, workflows.value, appSettings.value] = await Promise.all([
+  [templates.value, skills.value, agents.value, workflows.value, pipelines.value, appSettings.value] = await Promise.all([
     fetchTemplates(),
     fetchSkills(),
     fetchAgents(),
     fetchWorkflows(),
+    fetchPipelines(),
     fetchAppSettings(),
   ]);
 
@@ -339,6 +351,73 @@ async function handleDeleteWorkflow(workflowId) {
     }
   } catch (error) {
     errorMessage.value = String(error.message || error);
+  }
+}
+
+async function handleBootstrapPipeline() {
+  errorMessage.value = "";
+  if (pipelineBusy.value) return;
+  pipelineBusy.value = true;
+  try {
+    await bootstrapAiCodingPipeline();
+    agents.value = await fetchAgents();
+    pipelines.value = await fetchPipelines();
+  } catch (error) {
+    errorMessage.value = String(error.message || error);
+  } finally {
+    pipelineBusy.value = false;
+  }
+}
+
+async function handleGeneratePrdStories(payload) {
+  errorMessage.value = "";
+  if (pipelineBusy.value) return;
+  pipelineBusy.value = true;
+  try {
+    const run = await generatePrdStories(payload);
+    selectedPipelineRun.value = run;
+    pipelines.value = await fetchPipelines();
+  } catch (error) {
+    errorMessage.value = String(error.message || error);
+  } finally {
+    pipelineBusy.value = false;
+  }
+}
+
+async function handleRunPipelineStory(payload) {
+  errorMessage.value = "";
+  if (pipelineBusy.value) return;
+  pipelineBusy.value = true;
+  try {
+    const story = payload.story;
+    const storyId = story?.metadata?.story_id || story?.name || "Story";
+    const createdRun = await createPipelineRun(payload.pipelineId, {
+      title: storyId,
+      input_payload: {
+        story_id: storyId,
+        story_artifact_id: story.id,
+        source_prd_artifact_id: story.metadata?.source_prd_artifact_id || "",
+        story: story.content,
+      },
+    });
+    selectedPipelineRun.value = await executeSequentialPipelineRun(createdRun.id);
+  } catch (error) {
+    errorMessage.value = String(error.message || error);
+  } finally {
+    pipelineBusy.value = false;
+  }
+}
+
+async function handleExecutePipelineRun(runId) {
+  errorMessage.value = "";
+  if (pipelineBusy.value || !runId) return;
+  pipelineBusy.value = true;
+  try {
+    selectedPipelineRun.value = await executeSequentialPipelineRun(runId);
+  } catch (error) {
+    errorMessage.value = String(error.message || error);
+  } finally {
+    pipelineBusy.value = false;
   }
 }
 
@@ -619,6 +698,17 @@ onMounted(async () => {
             @update="handleUpdateWorkflow"
             @delete="handleDeleteWorkflow"
             @select="selectedWorkflowId = $event"
+          />
+
+          <PipelinesPage
+            v-else-if="currentPage === 'pipelines'"
+            :pipelines="pipelines"
+            :selected-run="selectedPipelineRun"
+            :busy="pipelineBusy"
+            @bootstrap="handleBootstrapPipeline"
+            @generate="handleGeneratePrdStories"
+            @run-story="handleRunPipelineStory"
+            @execute-run="handleExecutePipelineRun"
           />
 
           <PlaygroundPage

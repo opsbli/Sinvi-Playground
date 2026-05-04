@@ -145,6 +145,49 @@ class PipelineStore:
         ).fetchall()
         return [self._row_to_artifact(row) for row in rows]
 
+    def create_pipeline_artifact(
+        self,
+        pipeline_run_id: str,
+        *,
+        artifact_type: str,
+        name: str,
+        content: str,
+        metadata: dict[str, Any] | None = None,
+        stage_run_id: str | None = None,
+    ) -> PipelineArtifact:
+        artifact_id = _new_id("partifact")
+        now = _utc_now_iso()
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO pipeline_artifacts (
+                    id, pipeline_run_id, stage_run_id, artifact_type, name, content, metadata, created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    artifact_id,
+                    pipeline_run_id,
+                    stage_run_id,
+                    artifact_type,
+                    name,
+                    content,
+                    _json_dumps(metadata or {}),
+                    now,
+                ),
+            )
+            row = connection.execute(
+                """
+                SELECT id, pipeline_run_id, stage_run_id, artifact_type, name, content, metadata, created_at
+                FROM pipeline_artifacts
+                WHERE id = ?
+                """,
+                (artifact_id,),
+            ).fetchone()
+        if row is None:
+            raise RuntimeError("Pipeline artifact was not persisted.")
+        return self._row_to_artifact(row)
+
     def _row_to_run(self, connection: sqlite3.Connection, row: sqlite3.Row) -> PipelineRun:
         return PipelineRun(
             id=row["id"],

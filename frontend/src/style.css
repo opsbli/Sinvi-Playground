@@ -1744,6 +1744,53 @@ pre,
   line-height: 1.4;
 }
 
+.skill-store-flow-rail {
+  padding: 16px 32px 8px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  border-bottom: 1px solid #eef2ff;
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.8), rgba(255, 255, 255, 0.96));
+}
+
+.skill-store-flow-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+}
+
+.skill-store-flow-step strong {
+  display: block;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.skill-store-flow-step p {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.skill-store-flow-index {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: #2563eb;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 900;
+}
+
 .skill-store-grid {
   padding: 32px;
   overflow: auto;
@@ -1835,6 +1882,36 @@ pre,
   margin-bottom: 12px;
 }
 
+.skill-runtime-accordion {
+  margin: 0 0 12px;
+}
+
+.skill-runtime-accordion summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.skill-runtime-accordion summary::-webkit-details-marker {
+  display: none;
+}
+
+.skill-runtime-accordion-body {
+  margin-top: 8px;
+  display: grid;
+  gap: 6px;
+  padding: 0 2px 2px;
+}
+
+.skill-runtime-issue {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
 .skill-runtime-chip strong {
   color: #334155;
   font-size: 11px;
@@ -1876,9 +1953,25 @@ pre,
   text-transform: uppercase;
 }
 
+.skill-store-action-stack {
+  display: grid;
+  gap: 8px;
+}
+
+.skill-store-action-secondary {
+  background: #fff;
+  border-color: #cbd5e1;
+  color: #334155;
+}
+
 .skill-store-action:hover {
   background: #2563eb;
   box-shadow: 0 12px 24px rgba(15, 23, 42, 0.14);
+}
+
+.skill-store-action-secondary:hover {
+  background: #eff6ff;
+  color: #1d4ed8;
 }
 
 .skill-store-action.uninstall {
@@ -3649,6 +3742,11 @@ textarea:focus,
 
   .skill-store-sync-note {
     padding: 10px 20px;
+  }
+
+  .skill-store-flow-rail {
+    grid-template-columns: 1fr;
+    padding: 14px 20px 10px;
   }
 }
 

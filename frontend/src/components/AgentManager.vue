@@ -203,16 +203,9 @@ function getSkillRuntimeLabel(skill) {
   return "Runtime Blocked";
 }
 
-function getSkillRuntimeClass(skill) {
+function getSkillRuntimeIssues(skill) {
   const runtime = getSkillPreflight(skill);
-  if (!runtime) return "unknown";
-  if (runtime.ready) return "ready";
-  return "blocked";
-}
-
-function getSkillRuntimeDetail(skill) {
-  const runtime = getSkillPreflight(skill);
-  if (!runtime) return "";
+  if (!runtime) return [];
   const parts = [];
   const missingEnv = Array.isArray(runtime.missing_env_vars) ? runtime.missing_env_vars : [];
   if (missingEnv.length) {
@@ -249,7 +242,18 @@ function getSkillRuntimeDetail(skill) {
   if (!parts.length) {
     parts.push(String(runtime.message || ""));
   }
-  return parts.filter(Boolean).join(" \u2022 ");
+  return parts.filter(Boolean);
+}
+
+function getSkillRuntimeClass(skill) {
+  const runtime = getSkillPreflight(skill);
+  if (!runtime) return "unknown";
+  if (runtime.ready) return "ready";
+  return "blocked";
+}
+
+function getSkillRuntimeDetail(skill) {
+  return getSkillRuntimeIssues(skill).join(" \u2022 ");
 }
 
 function canCreate() {
@@ -384,6 +388,16 @@ async function toggleStoreSkill(skillId) {
     if (editingAgent.value?.id === storeAgent.value.id) {
       editingAgent.value.skill_ids = [...nextSkills];
     }
+  } finally {
+    isSavingStore.value = false;
+  }
+}
+
+async function installStoreSkill(skillId) {
+  if (isSavingStore.value) return;
+  isSavingStore.value = true;
+  try {
+    await installSkillPackage(skillId);
   } finally {
     isSavingStore.value = false;
   }
@@ -691,7 +705,23 @@ function getSkillDisplay(skillId) {
         </header>
         <div class="skill-store-target-note">
           <strong>{{ storeAgent?.name || "Selected agent" }}</strong>
-          <span>Install a skill into the workspace and bind it to this agent.</span>
+          <span>Step 1 installs the skill package into the workspace. Step 2 binds it to this agent. Quick install keeps both together.</span>
+        </div>
+        <div class="skill-store-flow-rail">
+          <div class="skill-store-flow-step">
+            <span class="skill-store-flow-index">1</span>
+            <div>
+              <strong>Install to workspace</strong>
+              <p>Download or refresh the local skill package so the workspace can run it.</p>
+            </div>
+          </div>
+          <div class="skill-store-flow-step">
+            <span class="skill-store-flow-index">2</span>
+            <div>
+              <strong>Bind to agent</strong>
+              <p>Attach the installed skill to the selected agent, or unbind it later.</p>
+            </div>
+          </div>
         </div>
         <div v-if="skillSyncStatus" class="skill-store-sync-note">
           {{ skillSyncStatus }}
@@ -715,22 +745,40 @@ function getSkillDisplay(skillId) {
             </div>
             <h4>{{ skill.name }}</h4>
             <p>{{ skill.description }}</p>
-            <div
-              class="skill-runtime-chip"
-              :class="getSkillRuntimeClass(skill)"
-            >
-              <strong>{{ getSkillRuntimeLabel(skill) }}</strong>
-              <span>{{ getSkillRuntimeDetail(skill) }}</span>
+            <details class="skill-runtime-accordion">
+              <summary class="skill-runtime-chip" :class="getSkillRuntimeClass(skill)">
+                <strong>{{ getSkillRuntimeLabel(skill) }}</strong>
+                <span>{{ getSkillRuntimeDetail(skill) }}</span>
+              </summary>
+              <div class="skill-runtime-accordion-body">
+                <div
+                  v-for="issue in getSkillRuntimeIssues(skill)"
+                  :key="`${skill.id}_${issue}`"
+                  class="skill-runtime-issue"
+                >
+                  {{ issue }}
+                </div>
+              </div>
+            </details>
+            <div class="skill-store-action-stack">
+              <button
+                type="button"
+                class="skill-store-action skill-store-action-secondary"
+                :disabled="isSavingStore"
+                @click="installStoreSkill(skill.id)"
+              >
+                Install to Workspace
+              </button>
+              <button
+                type="button"
+                class="skill-store-action"
+                :class="{ uninstall: isSkillInstalled(skill.id) }"
+                :disabled="isSavingStore"
+                @click="toggleStoreSkill(skill.id)"
+              >
+                {{ isSkillInstalled(skill.id) ? "Unbind from Agent" : "Install & Bind Skill" }}
+              </button>
             </div>
-            <button
-              type="button"
-              class="skill-store-action"
-              :class="{ uninstall: isSkillInstalled(skill.id) }"
-              :disabled="isSavingStore"
-              @click="toggleStoreSkill(skill.id)"
-            >
-              {{ isSkillInstalled(skill.id) ? "Uninstall from Agent" : "Install & Bind Skill" }}
-            </button>
           </article>
         </div>
 

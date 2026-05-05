@@ -5,9 +5,9 @@
 ## UI Design Decisions
 
 - Agent 卡片入口改成更明确的 `Open Skill Store`，减少用户把它理解成纯浏览入口的概率。
-- 技能仓库顶部增加一个目标说明区，明确当前选择的 agent 名称以及“install + bind”的动作含义。
-- 技能卡片上的主按钮改成 `Install & Bind Skill`，卸载按钮改成 `Uninstall from Agent`，把动作对象说清楚。
-- runtime chip 允许同时显示多个缺失原因，不再只展示第一条问题。
+- 技能仓库顶部增加一个目标说明区，并在其下方增加一条两步流程带，分别说明 `Install to workspace` 与 `Bind to agent`。
+- 技能卡片保留一键 `Install & Bind Skill` 快捷动作，同时补一个 `Install to Workspace` 次级动作。
+- runtime chip 允许同时显示多个缺失原因，并可展开查看完整详情，不再只展示第一条问题。
 - 继续沿用现有 modal、glass panel、chip 和 button 视觉语言，不引入新布局或新导航。
 
 ## Data Flow Decisions
@@ -21,6 +21,7 @@
   - `node_prepare_required`
   - `python_prepare_required`
 - 安装动作仍然是“先安装 skill 包，再更新 agent.skill_ids 绑定关系”，只改文案和状态展示，不改数据模型。
+- UI 允许用户独立触发 workspace install 或 install+bind 快捷动作，但不会更改技能安装 API 的定义。
 
 ## Non-Goals
 

@@ -6,8 +6,8 @@
 ## Scope
 
 - 将 agent 卡片入口文案改为更明确的“打开技能仓库/安装并绑定”语义。
-- 在技能仓库弹窗里明确说明安装动作会同时影响 workspace 与当前 agent 绑定。
-- 让 runtime 预检摘要同时展示缺失环境变量、缺失 shell 依赖和 auto-provision 错误。
+- 在技能仓库弹窗里明确区分“安装到 workspace”和“绑定到当前 agent”两步，同时保留一键快捷动作。
+- 让 runtime 预检摘要同时展示缺失环境变量、缺失 shell 依赖和 auto-provision 错误，并允许展开查看完整详情。
 
 ## Non-Goals
 
@@ -19,4 +19,5 @@
 
 - 用户从 Agent 卡片进入技能仓库时，能明确知道这是“安装并绑定”而不是纯浏览。
 - `search` 这类 skill 的预检提示能同时看到 `TAVILY_API_KEY`、`jq` 和 auto-provision 错误。
+- `search` 这类 skill 的预检提示能同时看到 `TAVILY_API_KEY`、`jq` 和 auto-provision 错误，并可展开查看完整详情。
 - UI 不改变现有技能安装与 Agent 绑定的数据模型。

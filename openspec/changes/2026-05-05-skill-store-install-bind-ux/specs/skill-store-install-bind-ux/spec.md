@@ -22,6 +22,28 @@
 - THEN 界面 SHALL 明确表述这是安装并绑定 skill
 - AND 已安装 skill 的主操作 SHALL 表述为从当前 agent 卸载
 
+### Requirement: Workspace Install Quick Action
+
+技能仓库 SHALL 提供一个不绑定 agent 的 workspace install 快捷动作。
+
+#### Scenario: User installs skill into workspace only
+
+- GIVEN 用户已打开某个 agent 的技能仓库
+- WHEN 用户点击 skill 的 workspace install 次级按钮
+- THEN 系统 SHALL 只安装或刷新 skill package
+- AND 系统 SHALL 不修改当前 agent 的 skill 绑定关系
+
+### Requirement: Expandable Runtime Details
+
+技能仓库 SHALL 允许用户展开 runtime 预检详情，以查看完整缺失原因。
+
+#### Scenario: User expands a blocked skill
+
+- GIVEN 一个 skill 的 runtime 预检包含多个缺失原因
+- WHEN 用户展开该 skill 的 runtime 区块
+- THEN 页面 SHALL 显示每个缺失项的独立详情
+- AND 页面 SHALL 保留简洁摘要作为默认视图
+
 ### Requirement: Multi-Reason Runtime Summary
 
 技能仓库 SHALL 在卡片上同时展示 skill runtime 预检的多个缺失原因。

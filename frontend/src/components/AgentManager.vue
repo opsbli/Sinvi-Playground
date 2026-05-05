@@ -5,6 +5,7 @@ import {
   Code,
   Database,
   FolderOpen,
+  FileText,
   Globe,
   Image as ImageIcon,
   Library,
@@ -180,15 +181,25 @@ function getSkillPreflight(skill) {
 function getSkillRuntimeLabel(skill) {
   const runtime = getSkillPreflight(skill);
   if (!runtime) return "Runtime Unknown";
+  const missingEnv = Array.isArray(runtime.missing_env_vars) ? runtime.missing_env_vars : [];
+  const missingDeps = Array.isArray(runtime.missing_shell_dependencies)
+    ? runtime.missing_shell_dependencies
+    : [];
+  const autoProvisionErrors = Array.isArray(runtime.auto_provision_errors)
+    ? runtime.auto_provision_errors
+    : [];
   const status = String(runtime.status || "");
-  if (status === "ready") return "Runtime Ready";
+  if (runtime.ready) return "Runtime Ready";
   if (status === "prompt_only") return "Prompt Only";
-  if (status === "missing_environment") return "Missing Env";
-  if (status === "missing_shell_dependencies") return "Missing Deps";
   if (status === "missing_launcher") return "Missing Launcher";
   if (status === "missing_command_target") return "Missing Script";
   if (status === "invalid_local_path") return "Invalid Path";
   if (status === "invalid_tool") return "Invalid Tool";
+  if (missingEnv.length && missingDeps.length) return "Missing Env + Deps";
+  if (missingEnv.length) return "Missing Env";
+  if (missingDeps.length && autoProvisionErrors.length) return "Setup Failed";
+  if (missingDeps.length) return "Missing Deps";
+  if (autoProvisionErrors.length) return "Setup Failed";
   return "Runtime Blocked";
 }
 
@@ -202,27 +213,43 @@ function getSkillRuntimeClass(skill) {
 function getSkillRuntimeDetail(skill) {
   const runtime = getSkillPreflight(skill);
   if (!runtime) return "";
+  const parts = [];
+  const missingEnv = Array.isArray(runtime.missing_env_vars) ? runtime.missing_env_vars : [];
+  if (missingEnv.length) {
+    parts.push(`Env: ${missingEnv.join(", ")}`);
+  }
   const missingLaunchers = Array.isArray(runtime.missing_launchers) ? runtime.missing_launchers : [];
   if (missingLaunchers.length) {
-    return `Launchers: ${missingLaunchers.join(", ")}`;
+    parts.push(`Launchers: ${missingLaunchers.join(", ")}`);
   }
   const missingDeps = Array.isArray(runtime.missing_shell_dependencies)
     ? runtime.missing_shell_dependencies
     : [];
   if (missingDeps.length) {
-    return `Dependencies: ${missingDeps.join(", ")}`;
+    parts.push(`Dependencies: ${missingDeps.join(", ")}`);
   }
-  const missingEnv = Array.isArray(runtime.missing_env_vars) ? runtime.missing_env_vars : [];
-  if (missingEnv.length) {
-    return `Env: ${missingEnv.join(", ")}`;
+  const autoProvisioned = Array.isArray(runtime.auto_provisioned_shell_dependencies)
+    ? runtime.auto_provisioned_shell_dependencies
+    : [];
+  if (autoProvisioned.length) {
+    parts.push(`Auto-provisioned: ${autoProvisioned.join(", ")}`);
+  }
+  const autoProvisionErrors = Array.isArray(runtime.auto_provision_errors)
+    ? runtime.auto_provision_errors
+    : [];
+  if (autoProvisionErrors.length) {
+    parts.push(`Auto-provision errors: ${autoProvisionErrors.join("; ")}`);
   }
   if (runtime.node_prepare_required) {
-    return "First run may install node dependencies";
+    parts.push("Node deps may install on first run");
   }
   if (runtime.python_prepare_required) {
-    return "First run may install python dependencies";
+    parts.push("Python deps may install on first run");
   }
-  return String(runtime.message || "");
+  if (!parts.length) {
+    parts.push(String(runtime.message || ""));
+  }
+  return parts.filter(Boolean).join(" \u2022 ");
 }
 
 function canCreate() {
@@ -431,7 +458,7 @@ function getSkillDisplay(skillId) {
               <button
                 class="icon-button icon-button-store"
                 type="button"
-                title="Install Skills"
+                title="Open Skill Store"
                 @click.stop="openSkillStore(agent.id)"
               >
                 <ShoppingBag :size="18" />
@@ -662,6 +689,10 @@ function getSkillDisplay(skillId) {
             </button>
           </div>
         </header>
+        <div class="skill-store-target-note">
+          <strong>{{ storeAgent?.name || "Selected agent" }}</strong>
+          <span>Install a skill into the workspace and bind it to this agent.</span>
+        </div>
         <div v-if="skillSyncStatus" class="skill-store-sync-note">
           {{ skillSyncStatus }}
         </div>
@@ -698,7 +729,7 @@ function getSkillDisplay(skillId) {
               :disabled="isSavingStore"
               @click="toggleStoreSkill(skill.id)"
             >
-              {{ isSkillInstalled(skill.id) ? "Uninstall" : "Install Skill" }}
+              {{ isSkillInstalled(skill.id) ? "Uninstall from Agent" : "Install & Bind Skill" }}
             </button>
           </article>
         </div>

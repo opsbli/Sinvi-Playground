@@ -211,7 +211,7 @@ def run_sequential_pipeline(
             artifact_type=ARTIFACT_TYPE_BY_ROLE[role],
             name=f"{role}-attempt-{attempt}",
             content=output.content,
-            metadata={"role": role, "attempt": attempt},
+            metadata={"role": role, "attempt": attempt, **output.output_payload},
             stage_run_id=stage_run.id,
         )
         _trace(store, run.id, "stage_completed", {"stage_run_id": stage_run.id, "role": role, "attempt": attempt})

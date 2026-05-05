@@ -3,9 +3,10 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from .pipeline_agent_runner import build_agent_stage_handlers
 from .pipeline_prd_story import run_prd_story_generation
 from .pipeline_schemas import PipelineDefinition, PipelineDefinitionCreate, PipelineRun, PipelineRunCreate
-from .pipeline_sequential import StageExecutionResult, run_sequential_pipeline
+from .pipeline_sequential import run_sequential_pipeline
 from .pipeline_store import PipelineStore
 from .schemas import AgentDefinitionCreate
 from .seeds.pipeline_prd_story_agents import seed_prd_story_agents
@@ -151,24 +152,6 @@ def _ensure_pipeline_definitions() -> AiCodingBootstrapResponse:
     )
 
 
-def _stage_handler(stage_input) -> StageExecutionResult:
-    story = str(stage_input.input_payload.get("story") or stage_input.input_payload.get("brief") or "").strip()
-    story_id = str(stage_input.input_payload.get("story_id") or "story").strip()
-    upstream = ", ".join(str(item.get("artifact_type")) for item in stage_input.upstream_artifacts) or "none"
-    content = (
-        f"# {stage_input.role.title()} Report\n\n"
-        f"## Story\n{story_id}\n\n"
-        f"## Input\n{story or 'No story content provided.'}\n\n"
-        f"## Upstream Artifacts\n{upstream}\n\n"
-        "## Result\n"
-        f"{stage_input.role} stage completed for this pipeline run.\n"
-    )
-    output_payload = {"role": stage_input.role, "story_id": story_id}
-    if stage_input.role == "validator":
-        output_payload["passed"] = True
-    return StageExecutionResult(content=content, output_payload=output_payload)
-
-
 @router.post("/pipelines/ai-coding/bootstrap", response_model=AiCodingBootstrapResponse)
 def bootstrap_ai_coding_pipeline() -> AiCodingBootstrapResponse:
     return _ensure_pipeline_definitions()
@@ -197,12 +180,11 @@ def execute_sequential_pipeline_run(run_id: str) -> PipelineRun:
     run_sequential_pipeline(
         pipeline_store,
         run_id,
-        handlers={
-            "designer": _stage_handler,
-            "reviewer": _stage_handler,
-            "coder": _stage_handler,
-            "validator": _stage_handler,
-        },
+        handlers=build_agent_stage_handlers(
+            pipeline_store=pipeline_store,
+            playground_store=store,
+            definition=definition,
+        ),
     )
     detail = pipeline_store.get_pipeline_run(run_id)
     if detail is None:

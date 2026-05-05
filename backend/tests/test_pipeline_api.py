@@ -126,3 +126,6 @@ def test_pipeline_api_executes_sequential_story_run(api_client) -> None:
         "implementation",
         "validation_report",
     }
+    design_artifact = next(artifact for artifact in detail["artifacts"] if artifact["artifact_type"] == "design")
+    assert design_artifact["metadata"]["agent_id"]
+    assert design_artifact["metadata"]["agent_name"] == "AI Coding Designer"

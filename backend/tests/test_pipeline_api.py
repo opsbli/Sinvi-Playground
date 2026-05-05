@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import sys
+
 
 def test_pipeline_api_creates_definition_and_run(api_client) -> None:
     definition_response = api_client.post(
@@ -104,6 +106,7 @@ def test_pipeline_api_executes_sequential_story_run(api_client) -> None:
             "input_payload": {
                 "story_id": "US-001",
                 "story": "# Story\n\nBuild the pipeline console.",
+                "validation_commands": [[sys.executable, "-c", "print('api validation ok')"]],
             },
         },
     )
@@ -125,7 +128,11 @@ def test_pipeline_api_executes_sequential_story_run(api_client) -> None:
         "design_review",
         "implementation",
         "validation_report",
+        "validation_commands",
     }
     design_artifact = next(artifact for artifact in detail["artifacts"] if artifact["artifact_type"] == "design")
     assert design_artifact["metadata"]["agent_id"]
     assert design_artifact["metadata"]["agent_name"] == "AI Coding Designer"
+    validation_artifact = next(artifact for artifact in detail["artifacts"] if artifact["artifact_type"] == "validation_commands")
+    assert validation_artifact["metadata"]["passed"] is True
+    assert validation_artifact["metadata"]["commands"][0]["exit_code"] == 0

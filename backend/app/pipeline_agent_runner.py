@@ -3,6 +3,12 @@ from __future__ import annotations
 from .pipeline_schemas import PipelineDefinition, PipelineArtifact
 from .pipeline_sequential import StageExecutionInput, StageExecutionResult, StageHandler
 from .pipeline_store import PipelineStore
+from .pipeline_validation_runner import normalize_validation_commands, run_validation_commands
+from .pipeline_workspace_executor import (
+    WorkspacePathError,
+    materialize_pipeline_files,
+    workspace_root_for_run,
+)
 from .runtime import llm_gateway
 from .store import SQLitePlaygroundStore
 
@@ -83,8 +89,74 @@ def build_agent_stage_handlers(
                 "agent_id": agent.id,
                 "agent_name": agent.name,
             }
+            workspace = workspace_root_for_run(pipeline_store, stage_input.pipeline_run_id)
+            if role == "coder":
+                try:
+                    materialized = materialize_pipeline_files(workspace, content)
+                except WorkspacePathError as exc:
+                    return StageExecutionResult(content="", blocked=True, error_message=str(exc))
+                output_payload["workspace_dir"] = str(materialized.workspace)
+                output_payload["generated_files"] = materialized.generated_files
+                if materialized.generated_files:
+                    pipeline_store.create_pipeline_artifact(
+                        stage_input.pipeline_run_id,
+                        artifact_type="workspace_manifest",
+                        name=f"workspace-attempt-{stage_input.attempt}",
+                        content="\n".join(materialized.generated_files),
+                        metadata={
+                            "role": role,
+                            "agent_id": agent.id,
+                            "agent_name": agent.name,
+                            "workspace_dir": str(materialized.workspace),
+                            "generated_files": materialized.generated_files,
+                        },
+                        stage_run_id=stage_input.stage_run_id,
+                    )
             if role == "validator":
-                output_payload["passed"] = True
+                commands = normalize_validation_commands(stage_input.input_payload.get("validation_commands"))
+                timeout = int(stage_input.input_payload.get("validation_timeout_seconds") or 30)
+                if commands:
+                    validation = run_validation_commands(
+                        workspace=workspace,
+                        commands=commands,
+                        timeout_seconds=timeout,
+                    )
+                    pipeline_store.create_pipeline_artifact(
+                        stage_input.pipeline_run_id,
+                        artifact_type="validation_commands",
+                        name=f"validation-attempt-{stage_input.attempt}",
+                        content="\n\n".join(
+                            [
+                                f"$ {' '.join(record['command'])}\n"
+                                f"exit_code={record['exit_code']} timeout={record['timeout']}\n"
+                                f"stdout:\n{record['stdout']}\n"
+                                f"stderr:\n{record['stderr']}"
+                                for record in validation.commands
+                            ]
+                        ),
+                        metadata={
+                            "role": role,
+                            "agent_id": agent.id,
+                            "agent_name": agent.name,
+                            "workspace_dir": str(workspace),
+                            "passed": validation.passed,
+                            "commands": validation.commands,
+                        },
+                        stage_run_id=stage_input.stage_run_id,
+                    )
+                    content = (
+                        f"{content}\n\n"
+                        "## Validation Commands\n"
+                        f"passed={validation.passed}\n"
+                        + "\n".join(
+                            f"- {' '.join(record['command'])}: exit_code={record['exit_code']} timeout={record['timeout']}"
+                            for record in validation.commands
+                        )
+                    )
+                    output_payload["validation_commands"] = validation.commands
+                    output_payload["passed"] = validation.passed
+                else:
+                    output_payload["passed"] = True
             return StageExecutionResult(content=content, output_payload=output_payload)
 
         return handler

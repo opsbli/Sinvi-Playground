@@ -398,6 +398,7 @@ async function handleRunPipelineStory(payload) {
         story_artifact_id: story.id,
         source_prd_artifact_id: story.metadata?.source_prd_artifact_id || "",
         story: story.content,
+        validation_commands: payload.validationCommands || [],
       },
     });
     selectedPipelineRun.value = await executeSequentialPipelineRun(createdRun.id);

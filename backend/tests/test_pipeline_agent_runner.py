@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import sys
 
 from app.pipeline_schemas import PipelineDefinitionCreate, PipelineRunCreate
 from app.pipeline_sequential import run_sequential_pipeline
@@ -121,3 +122,118 @@ def test_pipeline_agent_runner_blocks_when_stage_agent_is_missing(tmp_path: Path
     assert detail.status == "blocked"
     assert detail.stage_runs[0].status == "blocked"
     assert "not found" in (detail.stage_runs[0].error_message or "")
+
+
+def test_pipeline_agent_runner_materializes_workspace_and_runs_validation(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from app.pipeline_agent_runner import build_agent_stage_handlers
+
+    playground_store = SQLitePlaygroundStore(tmp_path / "playground.db")
+    designer = _create_agent(playground_store, "Design Agent")
+    reviewer = _create_agent(playground_store, "Review Agent")
+    coder = _create_agent(playground_store, "Code Agent")
+    validator = _create_agent(playground_store, "Validate Agent")
+    pipeline_store = PipelineStore(playground_store.db_path)
+    definition = pipeline_store.create_pipeline_definition(
+        PipelineDefinitionCreate(
+            name="AI Coding Sequential",
+            kind="sequential_pipeline",
+            stages=[
+                {"name": "Designer", "role": "designer", "agent_id": designer.id, "stage_order": 1},
+                {"name": "Reviewer", "role": "reviewer", "agent_id": reviewer.id, "stage_order": 2},
+                {"name": "Coder", "role": "coder", "agent_id": coder.id, "stage_order": 3},
+                {"name": "Validator", "role": "validator", "agent_id": validator.id, "stage_order": 4},
+            ],
+        )
+    )
+    run = pipeline_store.create_pipeline_run(
+        definition.id,
+        PipelineRunCreate(
+            title="US-001",
+            input_payload={
+                "story_id": "US-001",
+                "story": "Write a hello file",
+                "validation_commands": [
+                    [
+                        sys.executable,
+                        "-c",
+                        "from pathlib import Path; assert Path('src/hello.txt').read_text(encoding='utf-8') == 'hello pipeline\\n'",
+                    ]
+                ],
+            },
+        ),
+    )
+
+    def fake_run_agent(agent, _user_input, **_kwargs):
+        if agent.name == "Code Agent":
+            return '```pipeline-file path="src/hello.txt"\nhello pipeline\n```'
+        return f"{agent.name} completed"
+
+    monkeypatch.setattr("app.pipeline_agent_runner.llm_gateway.run_agent", fake_run_agent)
+
+    result = run_sequential_pipeline(
+        pipeline_store,
+        run.id,
+        handlers=build_agent_stage_handlers(
+            pipeline_store=pipeline_store,
+            playground_store=playground_store,
+            definition=definition,
+        ),
+    )
+    detail = pipeline_store.get_pipeline_run(run.id)
+
+    assert result.status == "done"
+    assert detail is not None
+    manifest = next(artifact for artifact in detail.artifacts if artifact.artifact_type == "workspace_manifest")
+    validation = next(artifact for artifact in detail.artifacts if artifact.artifact_type == "validation_commands")
+    assert manifest.metadata["generated_files"] == ["src/hello.txt"]
+    assert validation.metadata["passed"] is True
+    assert validation.metadata["commands"][0]["exit_code"] == 0
+
+
+def test_pipeline_agent_runner_blocks_on_unsafe_coder_path(tmp_path: Path, monkeypatch) -> None:
+    from app.pipeline_agent_runner import build_agent_stage_handlers
+
+    playground_store = SQLitePlaygroundStore(tmp_path / "playground.db")
+    agents = {role: _create_agent(playground_store, f"{role.title()} Agent") for role in ["designer", "reviewer", "coder", "validator"]}
+    pipeline_store = PipelineStore(playground_store.db_path)
+    definition = pipeline_store.create_pipeline_definition(
+        PipelineDefinitionCreate(
+            name="AI Coding Sequential",
+            kind="sequential_pipeline",
+            stages=[
+                {"name": "Designer", "role": "designer", "agent_id": agents["designer"].id, "stage_order": 1},
+                {"name": "Reviewer", "role": "reviewer", "agent_id": agents["reviewer"].id, "stage_order": 2},
+                {"name": "Coder", "role": "coder", "agent_id": agents["coder"].id, "stage_order": 3},
+                {"name": "Validator", "role": "validator", "agent_id": agents["validator"].id, "stage_order": 4},
+            ],
+        )
+    )
+    run = pipeline_store.create_pipeline_run(definition.id, PipelineRunCreate(title="US-001", input_payload={"story": "unsafe"}))
+
+    def fake_run_agent(agent, _user_input, **_kwargs):
+        if agent.name == "Coder Agent":
+            return '```pipeline-file path="../escape.txt"\nbad\n```'
+        return f"{agent.name} completed"
+
+    monkeypatch.setattr("app.pipeline_agent_runner.llm_gateway.run_agent", fake_run_agent)
+
+    result = run_sequential_pipeline(
+        pipeline_store,
+        run.id,
+        handlers=build_agent_stage_handlers(
+            pipeline_store=pipeline_store,
+            playground_store=playground_store,
+            definition=definition,
+        ),
+    )
+    detail = pipeline_store.get_pipeline_run(run.id)
+
+    assert result.status == "blocked"
+    assert detail is not None
+    coder_stage = next(stage for stage in detail.stage_runs if stage.input_payload.get("role") == "coder")
+    assert coder_stage.status == "blocked"
+    assert "escapes workspace" in (coder_stage.error_message or "")
+    assert not (tmp_path / "escape.txt").exists()

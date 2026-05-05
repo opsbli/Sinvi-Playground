@@ -6,6 +6,7 @@ agentic-workflow-playground-ui/
 backend/.runtime/
 backend/data/*.db
 backend/data/*.db.bak-*
+backend/data/pipeline-workspaces/
 backend/uvicorn*.log
 backend/generated/
 frontend/dist/

@@ -603,6 +603,28 @@ pre,
   box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.08);
 }
 
+.pipeline-validation-config {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 18px;
+  background: rgba(248, 250, 252, 0.58);
+}
+
+.pipeline-validation-input {
+  min-height: 104px;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+}
+
+.pipeline-help-text {
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .pipeline-wide-action {
   width: 100%;
   justify-content: center;

@@ -29,6 +29,7 @@ const props = defineProps({
 const emit = defineEmits(["bootstrap", "generate", "run-story", "execute-run", "select-run"]);
 
 const brief = ref("做一个 Pipeline Console，支持 PRD、Story、阶段执行和产物查看。");
+const validationCommandsText = ref("[\n  [\"python\", \"-m\", \"compileall\", \".\"]\n]");
 
 const prdStoryDefinition = computed(() =>
   props.pipelines.find((pipeline) => pipeline.kind === "prd_story_generation") || null,
@@ -43,6 +44,23 @@ const stories = computed(() =>
 );
 
 const visibleArtifacts = computed(() => props.selectedRun?.artifacts || []);
+
+const parsedValidationCommands = computed(() => {
+  const raw = validationCommandsText.value.trim();
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item) => Array.isArray(item) && item.length);
+  } catch {
+    return [];
+  }
+});
+
+const validationCommandInvalid = computed(() => {
+  const raw = validationCommandsText.value.trim();
+  return Boolean(raw) && !parsedValidationCommands.value.length;
+});
 
 function artifactPreview(artifact) {
   const content = String(artifact?.content || "").trim();
@@ -72,6 +90,7 @@ function runStory(story) {
   emit("run-story", {
     pipelineId: sequentialDefinition.value.id,
     story,
+    validationCommands: parsedValidationCommands.value,
   });
 }
 </script>
@@ -165,6 +184,22 @@ function runStory(story) {
               <Play :size="14" />
             </button>
           </article>
+        </div>
+
+        <div class="pipeline-validation-config">
+          <div class="pipeline-section-head">
+            <h3>Validation Commands</h3>
+            <span class="chip" :class="{ 'pipeline-status-failed': validationCommandInvalid }">
+              {{ validationCommandInvalid ? "invalid" : `${parsedValidationCommands.length} commands` }}
+            </span>
+          </div>
+          <textarea
+            v-model="validationCommandsText"
+            class="pipeline-brief-input pipeline-validation-input"
+            rows="4"
+            placeholder='[["python", "-m", "compileall", "."]]'
+          ></textarea>
+          <p class="pipeline-help-text">只接受 JSON argv arrays；后端使用 shell=false 并在 run workspace 内执行。</p>
         </div>
 
         <div v-if="!stories.length" class="pipeline-empty compact">
